@@ -10,6 +10,7 @@ Projeto desenvolvido como parte do **Bootcamp Santander / DIO**, demonstrando co
 - [Passo 2: Contexto, Ferramentas e Regras](#-passo-2-contexto-ferramentas-e-regras)
 - [Passo 3: Prompt Final Estruturado](#-passo-3-prompt-final-estruturado)
 - [Arquitetura dos Nós no N8N](#-arquitetura-dos-nós-no-n8n)
+- [Arquivo de Workflow (JSON Pronto para N8N)](#-arquivo-de-workflow-json-pronto-para-n8n)
 - [Como Submeter na DIO](#-como-submeter-na-dio)
 
 ---
@@ -105,6 +106,16 @@ flowchart LR
     I -- Sim --> J[Slack Node<br/>Alerta Urgente p/ SDR]
     I -- Não --> K[Fim do Fluxo]
 ```
+
+---
+
+## ⚡ Arquivo de Workflow (JSON Pronto para N8N)
+
+Para quem desejar testar a automação diretamente no **N8N** sem construir do zero:
+1. Abra o arquivo [`workflow.json`](./workflow.json).
+2. Copie todo o conteúdo JSON.
+3. No painel do **n8n**, pressione `Ctrl + V` (ou vá em **Menu** > **Import from JSON**).
+4. O canvas carregará automaticamente todos os 11 nós conectados, com tratamento de exceção (`Error Trigger`), qualificação por IA e roteamento.
 
 ---
 

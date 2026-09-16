@@ -1,0 +1,268 @@
+{
+  "name": "Captura, Qualificação com IA e Notificação de Leads",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-capture",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "1",
+      "name": "Webhook Lead Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "webhookId": "lead-capture-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nreturn items.map(item => {\n  const body = item.json.body || item.json;\n  const email = (body.email || '').trim().toLowerCase();\n  const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\n  const isValidEmail = emailRegex.test(email);\n  \n  let phone = (body.phone || body.telefone || '').replace(/\\D/g, '');\n  if (phone.length === 11 && !phone.startsWith('55')) {\n    phone = '55' + phone;\n  }\n\n  return {\n    json: {\n      name: body.name || body.nome || 'Lead Sem Nome',\n      email: email,\n      phone: phone,\n      company: body.company || body.empresa || 'Não informada',\n      role: body.role || body.cargo || 'Não informado',\n      estimatedRevenue: body.revenue || body.faturamento || 'Não informado',\n      isValid: isValidEmail,\n      timestamp: new Date().toISOString()\n    }\n  };\n});"
+      },
+      "id": "2",
+      "name": "Validação e Normalização",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.isValid }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "3",
+      "name": "Lead Válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "model": "gpt-4o-mini",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "Você é um classificador de leads B2B experiente. Analise os dados do lead e retorne APENAS um JSON estrito no formato:\n{\n  \"tier\": \"Tier A\" | \"Tier B\" | \"Tier C\",\n  \"score\": 1 a 100,\n  \"pitch_sugerido\": \"frase de abordagem em até 20 palavras\",\n  \"motivo\": \"justificativa concisa\"\n}"
+            },
+            {
+              "role": "user",
+              "content": "=Nome: {{ $json.name }}\nEmpresa: {{ $json.company }}\nCargo: {{ $json.role }}\nFaturamento: {{ $json.estimatedRevenue }}"
+            }
+          ]
+        },
+        "jsonOutput": true
+      },
+      "id": "4",
+      "name": "OpenAI Lead Scoring",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.4,
+      "position": [880, 200]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Leads"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData"
+        },
+        "options": {}
+      },
+      "id": "5",
+      "name": "Google Sheets Upsert",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1100, 200]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Validação e Normalização').item.json.email }}",
+        "subject": "Recebemos o seu contato! - Santander Bootcamp",
+        "message": "=Olá {{ $('Validação e Normalização').item.json.name }},\n\nObrigado pelo contato! Recebemos sua solicitação e nossa equipe comercial entrará em contato em breve.\n\nAtenciosamente,\nEquipe de Vendas",
+        "options": {}
+      },
+      "id": "6",
+      "name": "Gmail Enviar Boas-Vindas",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1320, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.tier }}",
+              "value2": "Tier A"
+            }
+          ]
+        }
+      },
+      "id": "7",
+      "name": "É Lead Tier A?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1320, 380]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "#vendas-leads-quentes"
+        },
+        "text": "=🚨 *Novo Lead Tier A Detectado!*\n*Nome:* {{ $('Validação e Normalização').item.json.name }}\n*Empresa:* {{ $('Validação e Normalização').item.json.company }} ({{ $('Validação e Normalização').item.json.role }})\n*Score:* {{ $json.score }}/100\n*Pitch Sugerido:* {{ $json.pitch_sugerido }}\n*Telefone:* {{ $('Validação e Normalização').item.json.phone }}"
+      },
+      "id": "8",
+      "name": "Slack Alerta SDR",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [1540, 360]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { status: 'rejected', reason: 'Email invalido', payload: $input.first().json } }];"
+      },
+      "id": "9",
+      "name": "Log Lead Inválido",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 440]
+    },
+    {
+      "parameters": {},
+      "id": "10",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [220, 600]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "#alertas-falhas-automacao"
+        },
+        "text": "=⚠️ *Falha detectada no Workflow N8N!*\n*Erro:* {{ $json.execution.error.message }}\n*Workflow:* {{ $json.workflow.name }}\n*Horário:* {{ $json.execution.startedAt }}"
+      },
+      "id": "11",
+      "name": "Slack Alerta Erro",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [440, 600]
+    }
+  ],
+  "connections": {
+    "Webhook Lead Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validação e Normalização",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validação e Normalização": {
+      "main": [
+        [
+          {
+            "node": "Lead Válido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lead Válido?": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Lead Scoring",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Lead Inválido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Lead Scoring": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets Upsert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets Upsert": {
+      "main": [
+        [
+          {
+            "node": "Gmail Enviar Boas-Vindas",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "É Lead Tier A?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "É Lead Tier A?": {
+      "main": [
+        [
+          {
+            "node": "Slack Alerta SDR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Slack Alerta Erro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
