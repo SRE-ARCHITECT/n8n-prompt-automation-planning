@@ -108,7 +108,7 @@
         "conditions": {
           "string": [
             {
-              "value1": "={{ $json.tier }}",
+              "value1": "={{ $('OpenAI Lead Scoring').item.json.tier }}",
               "value2": "Tier A"
             }
           ]
@@ -128,7 +128,7 @@
           "mode": "name",
           "value": "#vendas-leads-quentes"
         },
-        "text": "=🚨 *Novo Lead Tier A Detectado!*\n*Nome:* {{ $('Validação e Normalização').item.json.name }}\n*Empresa:* {{ $('Validação e Normalização').item.json.company }} ({{ $('Validação e Normalização').item.json.role }})\n*Score:* {{ $json.score }}/100\n*Pitch Sugerido:* {{ $json.pitch_sugerido }}\n*Telefone:* {{ $('Validação e Normalização').item.json.phone }}"
+        "text": "=🚨 *Novo Lead Tier A Detectado!*\n*Nome:* {{ $('Validação e Normalização').item.json.name }}\n*Empresa:* {{ $('Validação e Normalização').item.json.company }} ({{ $('Validação e Normalização').item.json.role }})\n*Score:* {{ $('OpenAI Lead Scoring').item.json.score }}/100\n*Pitch Sugerido:* {{ $('OpenAI Lead Scoring').item.json.pitch_sugerido }}\n*Telefone:* {{ $('Validação e Normalização').item.json.phone }}"
       },
       "id": "8",
       "name": "Slack Alerta SDR",
